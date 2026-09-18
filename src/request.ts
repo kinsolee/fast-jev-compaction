@@ -134,6 +134,10 @@ export function buildJevRequest(
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 /** Validates a Jev response body; throws on anything but an `answers` object. */
 export function parseJevResponse(
   status: number,
@@ -149,13 +153,7 @@ export function parseJevResponse(
   } catch {
     throw new Error('Jev returned malformed JSON');
   }
-  if (
-    parsed === null ||
-    typeof parsed !== 'object' ||
-    !('answers' in parsed) ||
-    parsed.answers === null ||
-    typeof parsed.answers !== 'object'
-  ) {
+  if (!isRecord(parsed) || !isRecord(parsed.answers)) {
     throw new Error('Jev response is missing answers');
   }
   return parsed as JevResponse;
@@ -166,24 +164,35 @@ export function noulAnswer(
   answers: Record<string, JevAnswer>,
   name: string,
 ): number {
-  const value = noulProbability(answers[name]);
+  const answer: unknown = isRecord(answers) && Object.hasOwn(answers, name)
+    ? answers[name]
+    : undefined;
+  const value = noulProbability(answer);
   if (value === undefined) throw new Error(`Invalid Jev answer for ${name}`);
   return value;
 }
 
-function noulProbability(answer: JevAnswer | undefined): number | undefined {
-  if (!answer) return undefined;
-  if ('noul' in answer && typeof answer.noul === 'number' && Number.isFinite(answer.noul)) {
-    return answer.noul;
+function noulProbability(answer: unknown): number | undefined {
+  if (!isRecord(answer)) return undefined;
+  if (Object.hasOwn(answer, 'noul')) {
+    if (answer.type !== undefined && answer.type !== 'noul') return undefined;
+    const value = answer.noul;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+      return undefined;
+    }
+    return value;
   }
   if (
-    'probability' in answer &&
-    typeof answer.probability === 'number' &&
-    Number.isFinite(answer.probability) &&
-    !('choice' in answer) &&
-    !('score' in answer)
+    Object.hasOwn(answer, 'probability') &&
+    (answer.type === undefined || answer.type === 'boolean') &&
+    !Object.hasOwn(answer, 'choice') &&
+    !Object.hasOwn(answer, 'score')
   ) {
-    return answer.probability;
+    const value = answer.probability;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+      return undefined;
+    }
+    return value;
   }
   return undefined;
 }
