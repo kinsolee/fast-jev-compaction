@@ -60,6 +60,15 @@ Copy this directory next to `src/` into
 `../src/index.js`, so the library sources must sit next to it), or use
 `pi -e /path/to/repo/pi/index.ts` for a quick test.
 
+### Gallery listing
+
+[pi.dev/packages](https://pi.dev/packages) is generated from the npm registry:
+published packages tagged with the `pi-package` keyword appear there
+automatically, with the install line taken from the package name and the repo
+link from `repository.url`. Both the keyword and the `pi` manifest are already
+declared in `package.json`, so publishing is the only remaining step — there is
+no submission form.
+
 ## Configuration
 
 The API key is read from the environment (`TYPESAFE_API_KEY`) and is **never
