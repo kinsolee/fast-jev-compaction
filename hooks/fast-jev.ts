@@ -10,6 +10,7 @@ import type {
 
 import { compact, reductionRatio, resolveOptions } from '../src/compact.js';
 import { buildJevRequest, DEFAULT_MODEL, parseJevResponse } from '../src/request.js';
+import { goalFromMessages } from '../src/state.js';
 import type {
   CompactOptions,
   CompactResult,
@@ -275,6 +276,10 @@ export const register: Register = (on: On, options: PluginOptions) => {
   on('session.compact', async ($, event, next) => {
     try {
       const config = { ...configured, apiKey: await getApiKey($, configured) };
+      if (event.instructions?.trim()) {
+        const goal = config.goal || goalFromMessages(event.messages);
+        config.goal = `${goal}\n\nCompaction instructions: ${event.instructions}`;
+      }
       const { result, messages } = await compactSession(event.messages, config, async (url, init) => {
         const response = await $.http.fetch(url, init);
         return { status: response.status, ok: response.ok, text: response.text };
