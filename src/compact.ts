@@ -20,6 +20,7 @@ export const DEFAULT_OPTIONS: ResolvedCompactOptions = {
   preserveRecentMessages: 6,
   maxStateTokens: 25_000,
   maxRequestTokens: 30_000,
+  maxConcurrentRequests: 4,
   truncateHeadChars: 300,
 };
 
@@ -48,6 +49,9 @@ export function resolveOptions(options: CompactOptions = {}): ResolvedCompactOpt
     maxRequestTokens: Math.max(
       1,
       finite(options.maxRequestTokens, DEFAULT_OPTIONS.maxRequestTokens),
+    ),
+    maxConcurrentRequests: Math.max(
+      1, Math.floor(finite(options.maxConcurrentRequests, DEFAULT_OPTIONS.maxConcurrentRequests)),
     ),
     truncateHeadChars: Math.max(
       0,
@@ -141,6 +145,33 @@ async function askBatch(
       },
     ]),
   );
+}
+
+/** Keep failures atomic while avoiding an unbounded burst of HTTP requests. */
+async function askBatches(
+  asker: JevAsker,
+  state: CompactionState,
+  batches: readonly ToolCall[][],
+  concurrency: number,
+): Promise<Map<string, CallAnswer>[]> {
+  const answers: Map<string, CallAnswer>[] = new Array(batches.length);
+  let cursor = 0;
+  let failed = false;
+  let failure: unknown;
+  const worker = async (): Promise<void> => {
+    while (!failed && cursor < batches.length) {
+      const index = cursor++;
+      try {
+        answers[index] = await askBatch(asker, state, batches[index]!);
+      } catch (error) {
+        if (!failed) failure = error;
+        failed = true;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, batches.length) }, worker));
+  if (failed) throw failure;
+  return answers;
 }
 
 function truncatedResultText(text: string, isError: boolean, headChars: number): string {
@@ -283,8 +314,8 @@ export async function compact(
     const state = fitState(messages, calls, resolved);
     fitted = state;
     batches = batchCalls(candidates, state.tokens, resolved);
-    const answered = await Promise.all(
-      batches.map((batch) => askBatch(asker, state.state, batch)),
+    const answered = await askBatches(
+      asker, state.state, batches, resolved.maxConcurrentRequests,
     );
     for (const map of answered) for (const [id, answer] of map) answers.set(id, answer);
   }
