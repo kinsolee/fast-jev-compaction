@@ -146,8 +146,8 @@ const fakeJev: JevAsker = {
 
 const CONFIG: ResolvedFastJevConfig = {
   keepThreshold: 0.5,
-  maxStateTokens: 25_000,
-  maxRequestTokens: 30_000,
+  maxStateTokens: Number.POSITIVE_INFINITY,
+  maxRequestTokens: Number.POSITIVE_INFINITY,
   truncateHeadChars: 300,
   minOldReduction: 0.25,
   dropThinking: false,

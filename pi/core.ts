@@ -38,9 +38,16 @@ export interface FastJevUserConfig {
   baseUrl?: string;
   /** Minimum keep probability for a call or result to stay. Default 0.5. */
   keepThreshold?: number;
-  /** Estimated token ceiling for the Jev state. Default 25000. */
+  /**
+   * Estimated token ceiling for the Jev state. UNSET = unlimited (the
+   * whole conversation goes to Jev). Set a finite number only to force
+   * a hard ceiling.
+   */
   maxStateTokens?: number;
-  /** Estimated ceiling for state plus one batch of questions. Default 30000. */
+  /**
+   * Estimated ceiling for state plus one batch of questions. UNSET =
+   * unlimited. Set a finite number only to force batching.
+   */
   maxRequestTokens?: number;
   /** Characters of a dropped tool result retained before its note. Default 300. */
   truncateHeadChars?: number;
@@ -74,10 +81,14 @@ export interface ResolvedFastJevConfig {
   disabled: boolean;
 }
 
+// State/request ceilings default to UNLIMITED (Infinity): a hardcoded 25k
+// cap turned every long session into a built-in-summary fallback — exactly
+// the sessions where Jev compaction matters most. Explicit finite values
+// (config file, env) still honored. Mirrors src/compact.ts DEFAULT_OPTIONS.
 export const FAST_JEV_DEFAULTS: ResolvedFastJevConfig = {
   keepThreshold: 0.5,
-  maxStateTokens: 25_000,
-  maxRequestTokens: 30_000,
+  maxStateTokens: Number.POSITIVE_INFINITY,
+  maxRequestTokens: Number.POSITIVE_INFINITY,
   truncateHeadChars: 300,
   minOldReduction: 0.25,
   dropThinking: false,
@@ -86,6 +97,26 @@ export const FAST_JEV_DEFAULTS: ResolvedFastJevConfig = {
 };
 
 const CONFIG_FILENAME = 'fast-jev-compaction.json';
+
+/**
+ * pi's standard credential store (~/.pi/agent/auth.json, 0600 — the same
+ * file /login writes). Read synchronously: loadConfig is sync and this
+ * runs once per compaction. Returns the `typesafe` entry's key or undefined.
+ * Survives GUI/IDE launches that never source ~/.zshrc (empty env).
+ */
+function readPiAuthKey(): string | undefined {
+  try {
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    if (!home) return undefined;
+    const raw = readFileSync(join(home, '.pi', 'agent', 'auth.json'), 'utf8');
+    const key = (JSON.parse(raw) as Record<string, { key?: unknown }>)[
+      'typesafe'
+    ]?.key;
+    return typeof key === 'string' && key.length > 0 ? key : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function readJsonFile(path: string): Record<string, unknown> {
   try {
@@ -145,7 +176,11 @@ export function loadConfig(sources: {
   const env = sources.env;
 
   const config: ResolvedFastJevConfig = {
-    apiKey: pickString(fileConfig, 'apiKey') ?? env.FAST_JEV_API_KEY ?? env.TYPESAFE_API_KEY,
+    apiKey:
+      pickString(fileConfig, 'apiKey') ??
+      env.FAST_JEV_API_KEY ??
+      env.TYPESAFE_API_KEY ??
+      readPiAuthKey(),
     model: pickString(fileConfig, 'model') ?? env.FAST_JEV_MODEL,
     baseUrl: pickString(fileConfig, 'baseUrl') ?? env.FAST_JEV_BASE_URL,
     keepThreshold: pickNumber(fileConfig, 'keepThreshold') ?? FAST_JEV_DEFAULTS.keepThreshold,
