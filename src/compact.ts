@@ -311,7 +311,15 @@ export async function compact(
   let batches: ToolCall[][] = [];
   const answers = new Map<string, CallAnswer>();
   if (candidates.length > 0) {
-    const state = fitState(messages, calls, resolved);
+    const largestQuestion = candidates.reduce((largest, call) => Math.max(
+      largest, estimateTokens(JSON.stringify(questionsFor(call))),
+    ), 0);
+    const stateBudget = resolved.maxRequestTokens - REQUEST_OVERHEAD_TOKENS - largestQuestion;
+    if (stateBudget < 1) throw new Error('request budget leaves no room for state and questions');
+    const state = fitState(messages, calls, {
+      ...resolved,
+      maxStateTokens: Math.min(resolved.maxStateTokens, stateBudget),
+    });
     fitted = state;
     batches = batchCalls(candidates, state.tokens, resolved);
     const answered = await askBatches(
