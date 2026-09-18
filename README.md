@@ -206,11 +206,31 @@ cleared after a successful restoration. Optional environment variables are
 `FAST_JEV_MAX_REQUEST_TOKENS`, `FAST_JEV_TRUNCATE_HEAD_CHARS`, and
 `FAST_JEV_CODEX_MAX_CONTEXT_CHARS`.
 
+## pi extension
+
+`pi/` is a [pi](https://github.com/earendil-works/pi-mono) extension, and the
+repository manifest (`"pi": { "extensions": ["./pi/index.ts"] }`) lets pi
+install it as a package:
+
+```sh
+pi install git:github.com/tamaratran/fast-jev-compaction
+```
+
+pi's compaction replaces the context with a summary plus the messages after
+`firstKeptEntryId`. The extension keeps that kept window untouched and writes
+the old region into the summary as a **verbatim transcript** minus the tool
+calls and results Jev drops or truncates — the pi equivalent of the Claude
+Code hook returning the pruned message list. The whole branch is re-examined
+on every compaction, so a result kept last round can still be pruned later.
+It falls back to pi's built-in summary when the key is missing, when Jev
+fails, or when the old region cannot be reduced enough. See
+[`pi/README.md`](pi/README.md) for configuration and the mapping in detail.
+
 ## Development
 
 ```sh
 npm install
-npm run typecheck        # library + hook
+npm run typecheck        # library + hook + pi extension
 npm test
 npm run build
 npm run validate:plugin  # claude plugin validate
@@ -219,7 +239,9 @@ TYPESAFE_API_KEY="$(cat ~/.typesafe_key)" npm run demo
 ```
 
 The unit tests use a fake Jev and never contact TypeSafe or the Vercel AI
-Gateway. The demo is the live network check.
+Gateway. The demo is the live network check; `npm run e2e:pi` additionally
+drives the pi extension through pi's own compaction machinery (it needs
+`@earendil-works/pi-coding-agent` installed).
 
 ## Animated demo (macOS)
 
