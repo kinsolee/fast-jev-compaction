@@ -36,6 +36,18 @@ claude plugin marketplace add tamaratran/fast-jev-compaction
 claude plugin install fast-jev-compaction@fast-jev-compaction
 ```
 
+`apiKey` is a required, sensitive option, kept in secure storage rather than
+settings.json. `claude plugin install` does not prompt for it; it reports the
+option as not yet set. Set it in the same command, or afterwards in Claude Code:
+
+```sh
+claude plugin install fast-jev-compaction@fast-jev-compaction --config apiKey=<your TypeSafe key>
+```
+
+```
+/plugin configure fast-jev-compaction
+```
+
 For local development:
 
 ```sh
@@ -59,12 +71,14 @@ The plugin declares these `userConfig` values in
 | `model` | `jev-latest` |
 | `provider` | *(unset)* |
 
-The key can be supplied as the sensitive `apiKey` plugin option, through
-`TYPESAFE_API_KEY`, or through `AI_GATEWAY_API_KEY`. Set `provider` to
+The key can be supplied as the required, sensitive `apiKey` plugin option,
+through `TYPESAFE_API_KEY`, or through `AI_GATEWAY_API_KEY`. Set `provider` to
 `vercel-ai-gateway` to force the Gateway; if it is unset, TypeSafe is used
 when a TypeSafe key is present, otherwise the Gateway is used when
-`AI_GATEWAY_API_KEY` is present. The environment variable is the recommended
-development setup.
+`AI_GATEWAY_API_KEY` is present. When the option is empty, the mod falls back
+to `TYPESAFE_API_KEY` or `AI_GATEWAY_API_KEY` from the environment or the
+`env` block of `~/.claude/settings.json`, which is the simplest setup for
+`--plugin-dir` development, where there is no install prompt.
 
 Every option except `apiKey`, `provider`, `compactAtPercent`,
 `minReductionRatio` and `model` is passed straight to the library; see the

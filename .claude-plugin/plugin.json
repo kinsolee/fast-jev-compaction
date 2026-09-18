@@ -12,7 +12,8 @@
       "type": "string",
       "title": "API key",
       "description": "API key for the selected provider. A vck_ key selects Vercel AI Gateway when provider is unset. Leave unset to use TYPESAFE_API_KEY or AI_GATEWAY_API_KEY.",
-      "sensitive": true
+      "sensitive": true,
+      "required": true
     },
     "provider": {
       "type": "string",
